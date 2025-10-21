@@ -1,0 +1,2989 @@
+<!doctype html>
+<html>
+
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JR Code Editor</title>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Tailwind CDN is intentionally used for standalone HTML exports -->
+<!-- This allows generated apps to work without build tools -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+
+<body>
+<div id="container"></div>
+<script>
+window.CALLAI_API_KEY = "sk-vibes-proxy-managed";
+window.CALLAI_CHAT_URL = "https://vibes-diy-api.com/";
+window.CALLAI_IMG_URL = "https://vibes-diy-api.com/";
+
+```
+function closePrimalCoreBanner() {
+  const badge = document.getElementById('primalcore-badge');
+  badge.classList.add('hidden');
+  localStorage.setItem('primalcoreBannerClosed', 'true');
+  setTimeout(() => badge.remove(), 200);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (localStorage.getItem('primalcoreBannerClosed') === 'true') {
+    const badge = document.getElementById('primalcore-badge');
+    if (badge) badge.remove();
+  }
+});
+
+```
+
+</script>
+<script type="importmap">
+{
+"imports": {
+"react": "https://esm.sh/react@19.2.0",
+"react-dom": "https://esm.sh/react-dom@19.2.0",
+"react-dom/client": "https://esm.sh/react-dom@19.2.0/client",
+"use-fireproof": "https://esm.sh/use-fireproof@0.23.14?deps=react@19.2.0,react-dom@19.2.0",
+"call-ai": "https://esm.sh/call-ai@latest?deps=react@19.2.0",
+"three": "https://esm.sh/three@latest"
+}
+}
+</script>
+<script type="text/babel" data-type="module" data-presets="react">
+import { createRoot } from "react-dom/client";
+
+```
+// prettier-ignore
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+
+```
+
+import { useFireproof } from "use-fireproof";
+import { callAI } from "call-ai";
+
+export default function App() {
+const { useDocument, useLiveQuery, database } = useFireproof("jrlivecodes-db");
+
+const { doc: project, merge: mergeProject } = useDocument({
+type: "project",
+title: "Untitled Project",
+html: `<div class="container">\\n  <h1>Hello, JR Live Codes</h1>\\n  <p>Edit HTML/CSS/JS and use the AI panel to generate code.</p>\\n  <button id="btn">Click</button>\\n</div>`,
+css: "body{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;margin:0;background:#ecf0f1;color:#34495e} .container{padding:24px} h1{font-size:32px;margin:0 0 8px} p{font-size:16px;margin:0 0 16px} button{background:#3498db;color:#fff;border:1px solid #3498db;padding:10px 16px;cursor:pointer;transition:all .2s ease} button:hover{background:#2d87c5}",
+js: "document.addEventListener(\"DOMContentLoaded\",()=>{const b=document.getElementById(\"btn\");if(b){b.addEventListener(\"click\",()=>alert(\"Hello!\"));}});",
+chatHistory: []
+});
+const { docs: projects } = useLiveQuery("type", { key: "project" }) || { docs: [] };
+
+const { doc: settings, merge: mergeSettings } = useDocument("app-settings", {
+_id: "app-settings",
+type: "settings",
+theme: "Dark",
+textSize: 14,
+puterEnabled: false,
+pollinationsEnabled: true,
+enabledMap: {},
+puterModels: [],
+pollinationsModels: [],
+puterTokenAmount: 0,
+userUsedTokens: 0,
+previousUsers: []
+});
+
+const containerRef = useRef(null);
+const iframeRef = useRef(null);
+const chatScrollRef = useRef(null);
+
+const [isMobile, setIsMobile] = useState(false);
+
+const [chatW, setChatW] = useState(26);
+const [editorW, setEditorW] = useState(38);
+const [previewW, setPreviewW] = useState(36);
+const [dragging, setDragging] = useState(null);
+
+const [activeTab, setActiveTab] = useState("html");
+const [isProjectsOpen, setIsProjectsOpen] = useState(false);
+const [previewKey, setPreviewKey] = useState(1);
+const [settingsOpen, setSettingsOpen] = useState(false);
+const [settingsTab, setSettingsTab] = useState("AI");
+const [modelsExpanded, setModelsExpanded] = useState(true);
+const [puterSectionExpanded, setPuterSectionExpanded] = useState(false);
+const [pollinationsSectionExpanded, setPollinationsSectionExpanded] = useState(false);
+
+const [model, setModel] = useState("gpt-4o");
+const [chatInput, setChatInput] = useState("");
+const [isGenerating, setIsGenerating] = useState(false);
+const [streamingMessage, setStreamingMessage] = useState("");
+const [collapsedMessages, setCollapsedMessages] = useState(new Set());
+const [editingMessageId, setEditingMessageId] = useState(null);
+const [editText, setEditText] = useState("");
+
+const [puterReady, setPuterReady] = useState(false);
+const [username, setUsername] = useState(null);
+const [showUserPopup, setShowUserPopup] = useState(false);
+
+const [loadingPuterModels, setLoadingPuterModels] = useState(false);
+
+const [tempPuterTokenAmount, setTempPuterTokenAmount] = useState("");
+const [tempUserUsedTokens, setTempUserUsedTokens] = useState("");
+
+const [puterSearchText, setPuterSearchText] = useState("");
+
+const [elementSelectMode, setElementSelectMode] = useState(false);
+const [selectedElement, setSelectedElement] = useState(null);
+
+const textSize = (settings && settings.textSize) || 14;
+
+useEffect(() => {
+const checkMobile = () => {
+const mobile = window.innerWidth < 768 ||
+/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+setIsMobile(mobile);
+};
+
+```
+checkMobile();
+window.addEventListener("resize", checkMobile);
+return () => window.removeEventListener("resize", checkMobile);
+
+```
+
+}, []);
+
+const themeVars = useMemo(() => {
+const palettes = {
+Dark: {
+bg: "#34495e",
+header: "#2c3e50",
+panel: "#2c3e50",
+text: "#ecf0f1",
+border: "#3b4b5f",
+primary: "#3498db",
+success: "#2ecc71",
+warn: "#f39c12",
+danger: "#e74c3c",
+accent: "#9b59b6"
+},
+Light: {
+bg: "#ecf0f1",
+header: "#ffffff",
+panel: "#ffffff",
+text: "#34495e",
+border: "#d0d7de",
+primary: "#3498db",
+success: "#2ecc71",
+warn: "#f39c12",
+danger: "#e74c3c",
+accent: "#9b59b6"
+},
+Grey: {
+bg: "#f3f4f6",
+header: "#f9fafb",
+panel: "#f9fafb",
+text: "#374151",
+border: "#e5e7eb",
+primary: "#4b5563",
+success: "#059669",
+warn: "#d97706",
+danger: "#dc2626",
+accent: "#6b7280"
+},
+Sunshine: {
+bg: "#fff8e1",
+header: "#fff3c4",
+panel: "#fffdf2",
+text: "#5b3e00",
+border: "#ffe58f",
+primary: "#f39c12",
+success: "#2ecc71",
+warn: "#f39c12",
+danger: "#e74c3c",
+accent: "#e67e22"
+},
+Multicoloured: {
+bg: "#f8fafc",
+header: "#ffffff",
+panel: "#ffffff",
+text: "#0f172a",
+border: "#e2e8f0",
+primary: "#3498db",
+success: "#2ecc71",
+warn: "#f39c12",
+danger: "#e74c3c",
+accent: "#9b59b6"
+}
+};
+const t = (settings && settings.theme) || "Dark";
+return palettes[t] || palettes.Dark;
+}, [settings]);
+
+const ExtraCSS =     `.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }     .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }     @keyframes pulseBorder {       0% { border-color: rgba(52,152,219,0.15); }       50% { border-color: rgba(52,152,219,0.9); }       100% { border-color: rgba(52,152,219,0.15); }     }     .ai-pulse { animation: pulseBorder 1s ease-in-out infinite; border-style: solid; }     @keyframes slideUp {       from { transform: translateY(100%); }       to { transform: translateY(0); }     }     .slide-up { animation: slideUp 0.3s ease-out; }`  ;
+
+useEffect(() => {
+if (settings && settingsOpen) {
+if (tempPuterTokenAmount === "") {
+setTempPuterTokenAmount((settings.puterTokenAmount || 0).toString());
+}
+if (tempUserUsedTokens === "") {
+setTempUserUsedTokens((settings.userUsedTokens || 0).toString());
+}
+}
+}, [settings, settingsOpen, tempPuterTokenAmount, tempUserUsedTokens]);
+
+useEffect(() => {
+const existing = document.querySelector('script[src="https://js.puter.com/v2/"]');
+if (existing) {
+setPuterReady(true);
+try {
+const api = window.puter || window.Puter || window.p || {};
+if (api.auth && typeof api.auth.getUser === "function") {
+api.auth.getUser().then((u) => u && setUsername(u.username || [u.name](http://u.name/) || u.user?.username || "user")).catch(() => { });
+}
+} catch { }
+return;
+}
+const s = document.createElement("script");
+s.src = "https://js.puter.com/v2/";
+s.async = true;
+s.onload = () => {
+setPuterReady(true);
+try {
+const api = window.puter || window.Puter || window.p || {};
+if (api.auth && typeof api.auth.getUser === "function") {
+api.auth.getUser().then((u) => u && setUsername(u.username || [u.name](http://u.name/) || u.user?.username || "user")).catch(() => { });
+}
+} catch { }
+};
+document.body.appendChild(s);
+}, []);
+
+const handlePuterLogin = useCallback(async () => {
+try {
+const api = window.puter || window.Puter || window.p || {};
+let u = null;
+if (api.auth?.signIn) u = await api.auth.signIn();
+else if (api.auth?.login) u = await api.auth.login();
+else if (api.auth?.signin) u = await api.auth.signin();
+else if (api.auth?.sign_in) u = await api.auth.sign_in();
+if (u) {
+const newUsername = u.username || [u.name](http://u.name/) || u.user?.username || "user";
+setUsername(newUsername);
+const prevUsers = settings?.previousUsers || [];
+if (!prevUsers.includes(newUsername)) {
+mergeSettings({ previousUsers: [...prevUsers, newUsername] });
+}
+return;
+}
+const fallback = window.prompt("Enter username");
+if (fallback) {
+setUsername(fallback);
+const prevUsers = settings?.previousUsers || [];
+if (!prevUsers.includes(fallback)) {
+mergeSettings({ previousUsers: [...prevUsers, fallback] });
+}
+}
+} catch {
+const fallback = window.prompt("Login failed. Enter username");
+if (fallback) {
+setUsername(fallback);
+const prevUsers = settings?.previousUsers || [];
+if (!prevUsers.includes(fallback)) {
+mergeSettings({ previousUsers: [...prevUsers, fallback] });
+}
+}
+}
+}, [settings, mergeSettings]);
+
+const handlePuterLogout = useCallback(() => {
+setUsername(null);
+setShowUserPopup(false);
+}, []);
+
+const switchUser = useCallback((user) => {
+setUsername(user);
+setShowUserPopup(false);
+}, []);
+
+useEffect(() => {
+if (isMobile) return;
+
+```
+function onMove(e) {
+  if (!dragging || !containerRef.current) return;
+  const rect = containerRef.current.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const total = rect.width;
+  const percent = (x / total) * 100;
+  const min = 15;
+  if (dragging === "left") {
+    let newChat = Math.max(min, Math.min(percent, 60));
+    let remaining = 100 - previewW - newChat;
+    let newEditor = Math.max(min, remaining);
+    if (newEditor < min) {
+      newEditor = min;
+      newChat = 100 - previewW - newEditor;
+    }
+    setChatW(newChat);
+    setEditorW(newEditor);
+  } else if (dragging === "right") {
+    let leftEdge = chatW;
+    let newEditor = Math.max(min, Math.min(percent - leftEdge, 70));
+    let newPreview = 100 - chatW - newEditor;
+    if (newPreview < min) {
+      newPreview = min;
+      newEditor = 100 - chatW - newPreview;
+    }
+    setEditorW(newEditor);
+    setPreviewW(newPreview);
+  }
+}
+function onUp() {
+  setDragging(null);
+}
+window.addEventListener("mousemove", onMove);
+window.addEventListener("mouseup", onUp);
+return () => {
+  window.removeEventListener("mousemove", onMove);
+  window.removeEventListener("mouseup", onUp);
+};
+
+```
+
+}, [dragging, chatW, previewW, isMobile]);
+
+const baseModels = useMemo(() => [
+{ group: "OpenAI", value: "gpt-4o", label: "gpt-4o" },
+{ group: "OpenAI", value: "gpt-4.1-mini", label: "gpt-4.1-mini" },
+{ group: "OpenAI", value: "gpt-5-mini", label: "gpt-5-mini" },
+{ group: "Claude", value: "claude-sonnet-4", label: "claude-sonnet-4" },
+{ group: "Claude", value: "claude-opus-4", label: "claude-opus-4" },
+{ group: "Claude", value: "claude-opus-4-1", label: "claude-opus-4-1" },
+{ group: "Claude", value: "claude-sonnet-4-5", label: "claude-sonnet-4-5" },
+{ group: "Gemini", value: "gemini-2.5-flash-lite", label: "gemini-2.5-flash-lite" },
+{ group: "Gemini", value: "google/gemini-2.5-pro", label: "google/gemini-2.5-pro" },
+{ group: "Grok", value: "x-ai/grok-4", label: "x-ai/grok-4" },
+{ group: "Grok", value: "x-ai/grok-4-fast:free", label: "x-ai/grok-4-fast:free" },
+{ group: "Qwen", value: "qwen2.5-coder-32b-instruct", label: "qwen2.5-coder-32b-instruct" },
+{ group: "Qwen", value: "qwen/qwen3-coder", label: "qwen/qwen3-coder" },
+{ group: "Kimi", value: "moonshotai/kimi-k2", label: "moonshotai/kimi-k2" }
+], []);
+
+const pollinationsModels = useMemo(() => [
+"mistral",
+"openai",
+"openai-fast",
+"qwen-coder",
+"bidara",
+"chickytutor",
+"midijourney"
+], []);
+
+useEffect(() => {
+if (!settings) return;
+const next = { ...(settings.enabledMap || {}) };
+let changed = false;
+
+```
+baseModels.forEach((m) => {
+  const k = `${m.group}|${m.value}`;
+  if (next[k] === undefined) {
+    next[k] = true;
+    changed = true;
+  }
+});
+
+(settings.puterModels || []).forEach((name) => {
+  const k = `Puter|${name}`;
+  if (next[k] === undefined) {
+    next[k] = false;
+    changed = true;
+  }
+});
+
+pollinationsModels.forEach((name) => {
+  const k = `Pollinations|${name}`;
+  if (next[k] === undefined) {
+    next[k] = false;
+    changed = true;
+  }
+});
+
+if (changed) {
+  mergeSettings({ enabledMap: next });
+}
+
+```
+
+}, [settings, baseModels, mergeSettings, pollinationsModels]);
+
+const availableModelGroups = useMemo(() => {
+const groups = {};
+const enabledMap = (settings && settings.enabledMap) || {};
+
+```
+baseModels.forEach((m) => {
+  const key = `${m.group}|${m.value}`;
+  const enabled = !!enabledMap[key];
+  if (enabled) {
+    if (!groups[m.group]) groups[m.group] = [];
+    groups[m.group].push({ value: m.value, label: m.label });
+  }
+});
+
+if (settings && settings.puterEnabled) {
+  const list = settings.puterModels || [];
+  list.forEach((name) => {
+    const k = `Puter|${name}`;
+    if (enabledMap[k]) {
+      if (!groups["Puter"]) groups["Puter"] = [];
+      groups["Puter"].push({ value: name, label: name });
+    }
+  });
+}
+
+if (settings && settings.pollinationsEnabled) {
+  pollinationsModels.forEach((name) => {
+    const k = `Pollinations|${name}`;
+    if (enabledMap[k]) {
+      if (!groups["Pollinations"]) groups["Pollinations"] = [];
+      groups["Pollinations"].push({ value: name, label: name });
+    }
+  });
+}
+
+return groups;
+
+```
+
+}, [settings, baseModels, pollinationsModels]);
+
+useEffect(() => {
+const groups = availableModelGroups;
+const all = Object.values(groups).flat();
+if (!all.find((m) => m.value === model)) {
+if (all.length > 0) setModel(all[0].value);
+}
+}, [availableModelGroups, model]);
+
+const isPuterModel = useMemo(() => {
+return availableModelGroups["Puter"]?.some(m => m.value === model);
+}, [availableModelGroups, model]);
+
+const isPollinationsModel = useMemo(() => {
+return availableModelGroups["Pollinations"]?.some(m => m.value === model);
+}, [availableModelGroups, model]);
+
+const refreshPuterModels = useCallback(async () => {
+try {
+setLoadingPuterModels(true);
+const res = await fetch("https://api.puter.com/puterai/chat/models/", { method: "GET" });
+const data = await res.json();
+let names = [];
+if (Array.isArray(data)) {
+names = data.map((x) => (typeof x === "string" ? x : x?.name)).filter(Boolean);
+} else if (data && Array.isArray(data.models)) {
+names = data.models.map((x) => (typeof x === "string" ? x : x?.name)).filter(Boolean);
+}
+mergeSettings({ puterModels: names || [] });
+} catch {
+// ignore
+} finally {
+setLoadingPuterModels(false);
+}
+}, [mergeSettings]);
+
+const selectAllPuterModels = useCallback(() => {
+const emap = { ...((settings && settings.enabledMap) || {}) };
+(settings.puterModels || []).forEach((name) => {
+emap[`Puter|${name}`] = true;
+});
+mergeSettings({ enabledMap: emap });
+}, [settings, mergeSettings]);
+
+const deselectAllPuterModels = useCallback(() => {
+const emap = { ...((settings && settings.enabledMap) || {}) };
+(settings.puterModels || []).forEach((name) => {
+emap[`Puter|${name}`] = false;
+});
+mergeSettings({ enabledMap: emap });
+}, [settings, mergeSettings]);
+
+const selectAllPollinationsModels = useCallback(() => {
+const emap = { ...((settings && settings.enabledMap) || {}) };
+pollinationsModels.forEach((name) => {
+emap[`Pollinations|${name}`] = true;
+});
+mergeSettings({ enabledMap: emap });
+}, [settings, mergeSettings, pollinationsModels]);
+
+const deselectAllPollinationsModels = useCallback(() => {
+const emap = { ...((settings && settings.enabledMap) || {}) };
+pollinationsModels.forEach((name) => {
+emap[`Pollinations|${name}`] = false;
+});
+mergeSettings({ enabledMap: emap });
+}, [settings, mergeSettings, pollinationsModels]);
+
+const saveTokenSettings = useCallback(() => {
+const puterAmount = parseFloat(tempPuterTokenAmount) || 0;
+const usedAmount = parseFloat(tempUserUsedTokens) || 0;
+mergeSettings({
+puterTokenAmount: puterAmount,
+userUsedTokens: usedAmount
+});
+}, [tempPuterTokenAmount, tempUserUsedTokens, mergeSettings]);
+
+const updateTokenUsage = useCallback((tokensUsed) => {
+const currentUsed = (settings && settings.userUsedTokens) || 0;
+const newUsed = currentUsed + tokensUsed;
+mergeSettings({ userUsedTokens: newUsed });
+}, [settings, mergeSettings]);
+
+const tokenUsedPercent = useMemo(() => {
+const total = (settings && settings.puterTokenAmount) || 0;
+const used = (settings && settings.userUsedTokens) || 0;
+if (total === 0) return 0;
+return Math.min(100, (used / total) * 100);
+}, [settings]);
+
+const callPollinationsAPI = useCallback(async (prompt, modelName) => {
+try {
+const url = `https://text.pollinations.ai/openai`;
+const response = await fetch(url, {
+method: "POST",
+headers: {
+"Content-Type": "application/json"
+},
+body: JSON.stringify({
+model: modelName,
+messages: [
+{ role: "system", content: "You are an expert web developer. Return ONLY valid JSON with keys: html, css, js, explanation." },
+{ role: "user", content: prompt }
+],
+stream: false,
+jsonMode: true
+})
+});
+
+```
+  if (!response.ok) {
+    throw new Error(`Pollinations API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || data.message?.content || "";
+
+  const inputTokens = data.usage?.prompt_tokens || 0;
+  const outputTokens = data.usage?.completion_tokens || 0;
+  const totalTokens = inputTokens + outputTokens;
+
+  const estimatedTokens = totalTokens || Math.ceil((prompt.length + content.length) / 4);
+  const costPerToken = 0.000001;
+  const estimatedCost = estimatedTokens * costPerToken;
+
+  updateTokenUsage(estimatedCost);
+
+  return content;
+} catch (error) {
+  console.error("Pollinations API error:", error);
+  throw error;
+}
+
+```
+
+}, [updateTokenUsage]);
+
+const toggleMessageCollapse = useCallback((messageId) => {
+setCollapsedMessages(prev => {
+const next = new Set(prev);
+if (next.has(messageId)) {
+next.delete(messageId);
+} else {
+next.add(messageId);
+}
+return next;
+});
+}, []);
+
+const handleCopyMessage = useCallback((content) => {
+navigator.clipboard.writeText(content);
+}, []);
+
+const handleDeleteMessage = useCallback((index) => {
+const history = [...(project.chatHistory || [])];
+history.splice(index, 1);
+mergeProject({ chatHistory: history });
+}, [project, mergeProject]);
+
+const handleStartEdit = useCallback((index, content) => {
+setEditingMessageId(index);
+setEditText(content);
+}, []);
+
+const handleSaveEdit = useCallback((index) => {
+const history = [...(project.chatHistory || [])];
+history[index].content = editText;
+mergeProject({ chatHistory: history });
+setEditingMessageId(null);
+setEditText("");
+}, [editText, project, mergeProject]);
+
+const handleResendMessage = useCallback(async (content) => {
+setChatInput(content);
+setTimeout(() => {
+const form = document.querySelector('form');
+if (form) {
+form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+}
+}, 100);
+}, []);
+
+const handleRedoMessage = useCallback(async (index) => {
+if (index === 0) return;
+const userMessage = project.chatHistory[index - 1];
+if (userMessage && userMessage.role === "user") {
+handleResendMessage(userMessage.content);
+}
+}, [project, handleResendMessage]);
+
+const enableElementSelectMode = useCallback(() => {
+setElementSelectMode(prev => !prev);
+}, []);
+
+useEffect(() => {
+const handleMessage = (event) => {
+if (event.data && event.data.type === "elementSelected") {
+setSelectedElement(event.data.element);
+setElementSelectMode(false);
+}
+};
+
+```
+window.addEventListener("message", handleMessage);
+return () => window.removeEventListener("message", handleMessage);
+
+```
+
+}, []);
+
+const elementSelectScript = `
+<script>
+(function() {
+let selectMode = false;
+let highlightedElement = null;
+
+```
+    window.addEventListener('message', function(event) {
+      if (event.data === 'enableElementSelect') {
+        selectMode = true;
+        document.body.style.cursor = 'crosshair';
+      } else if (event.data === 'disableElementSelect') {
+        selectMode = false;
+        document.body.style.cursor = 'default';
+        if (highlightedElement) {
+          highlightedElement.style.outline = '';
+          highlightedElement = null;
+        }
+      }
+    });
+
+    document.addEventListener('mouseover', function(e) {
+      if (!selectMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (highlightedElement) {
+        highlightedElement.style.outline = '';
+      }
+
+      highlightedElement = e.target;
+      highlightedElement.style.outline = '2px solid #3498db';
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!selectMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const element = e.target;
+      const elementInfo = {
+        type: 'elementSelected',
+        element: {
+          tagName: element.tagName.toLowerCase(),
+          innerHTML: element.innerHTML.substring(0, 200),
+          outerHTML: element.outerHTML.substring(0, 400),
+          className: element.className,
+          id: element.id,
+          textContent: element.textContent.substring(0, 100)
+        }
+      };
+
+      window.parent.postMessage(elementInfo, '*');
+
+      if (highlightedElement) {
+        highlightedElement.style.outline = '';
+        highlightedElement = null;
+      }
+
+      selectMode = false;
+      document.body.style.cursor = 'default';
+    });
+  })();
+<\\/script>
+
+```
+
+`;
+
+useEffect(() => {
+if (iframeRef.current && iframeRef.current.contentWindow) {
+if (elementSelectMode) {
+iframeRef.current.contentWindow.postMessage('enableElementSelect', '*');
+} else {
+iframeRef.current.contentWindow.postMessage('disableElementSelect', '*');
+}
+}
+}, [elementSelectMode]);
+
+const previewHTML = useMemo(() => {
+return `<!DOCTYPE html> <html> <head> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1.0" /> <style> ${project.css || ""} html, body { height: 100%; font-size: ${textSize}px; } </style> </head> <body> ${project.html || ""} ${elementSelectScript} <script> ${project.js || ""} <\\/script> </body> </html>`;
+}, [project.html, project.css, project.js, textSize, elementSelectScript]);
+
+useEffect(() => {
+const el = chatScrollRef.current;
+if (el) el.scrollTop = el.scrollHeight;
+}, [project.chatHistory, isGenerating, streamingMessage]);
+
+const runPreview = useCallback(() => setPreviewKey((k) => k + 1), []);
+const handleSave = useCallback(async () => {
+await database.put({
+...project,
+_id: project._id || `project-${Date.now()}`,
+updatedAt: Date.now()
+});
+}, [database, project]);
+const handleNew = useCallback(() => {
+mergeProject({
+title: "Untitled Project",
+html: "<div class=\"container\">\n  <h1>New Project</h1>\n</div>",
+css: "body{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;margin:0;background:#ecf0f1;color:#34495e} .container{padding:24px}",
+js: "console.log(\"New project\");",
+chatHistory: [],
+_id: undefined
+});
+setPreviewKey((k) => k + 1);
+}, [mergeProject]);
+const loadProject = useCallback((p) => {
+mergeProject({
+title: p.title,
+html: p.html,
+css: p.css,
+js: p.js,
+chatHistory: p.chatHistory || [],
+_id: p._id
+});
+setIsProjectsOpen(false);
+setPreviewKey((k) => k + 1);
+}, [mergeProject]);
+
+const toggleModelEnabled = useCallback((group, value) => {
+const key = `${group}|${value}`;
+const emap = { ...((settings && settings.enabledMap) || {}) };
+emap[key] = !emap[key];
+mergeSettings({ enabledMap: emap });
+}, [settings, mergeSettings]);
+
+const handleAIGenerate = useCallback(async (e) => {
+e.preventDefault();
+if (!chatInput.trim() || isGenerating) return;
+
+```
+const userMessage = chatInput.trim();
+setChatInput("");
+setIsGenerating(true);
+setStreamingMessage("");
+
+const history = [
+  ...(project.chatHistory || []),
+  { role: "user", content: userMessage, timestamp: Date.now() }
+];
+mergeProject({ chatHistory: history });
+
+const prompt = `You are an expert web coder. Update the user's HTML, CSS, and JavaScript to fulfill the request.
+
+```
+
+Return ONLY valid JSON with keys: html, css, js, explanation. Do not include markdown formatting or code blocks.
+
+Current HTML:
+${project.html || ""}
+
+Current CSS:
+${project.css || ""}
+
+Current JS:
+${project.js || ""}
+
+User request:
+${userMessage}`;
+
+```
+const isPuter = isPuterModel;
+const isPoll = isPollinationsModel;
+
+try {
+  if (isPuter && puterReady) {
+    const api = window.puter || window.Puter || window.p || {};
+    if (api.ai && api.ai.chat) {
+      const chatMessages = [{ role: "user", content: prompt }];
+      const response = await api.ai.chat(chatMessages, { model });
+
+      const responseText = response.message?.content || response.content || response;
+
+      if (response.usage) {
+        const inputTokens = response.usage.input_tokens || 0;
+        const outputTokens = response.usage.output_tokens || 0;
+        const totalTokens = inputTokens + outputTokens;
+        const costPerToken = 0.000001;
+        const estimatedCost = totalTokens * costPerToken;
+        updateTokenUsage(estimatedCost);
+      }
+
+      let result;
+      try {
+        const cleanResponse = responseText.replace(/```json\\n?/g, "").replace(/```\\n?/g, "").trim();
+        result = JSON.parse(cleanResponse);
+      } catch {
+        result = { explanation: responseText };
+      }
+
+      mergeProject({
+        html: result.html !== undefined ? result.html : project.html,
+        css: result.css !== undefined ? result.css : project.css,
+        js: result.js !== undefined ? result.js : project.js,
+        chatHistory: [
+          ...history,
+          { role: "assistant", content: result.explanation || "Code updated.", timestamp: Date.now(), modelUsed: model }
+        ]
+      });
+      setPreviewKey((k) => k + 1);
+    }
+  } else if (isPoll) {
+    const responseText = await callPollinationsAPI(prompt, model);
+
+    let result;
+    try {
+      const cleanResponse = responseText.replace(/```json\\n?/g, "").replace(/```\\n?/g, "").trim();
+      result = JSON.parse(cleanResponse);
+    } catch {
+      result = { explanation: responseText };
+    }
+
+    mergeProject({
+      html: result.html !== undefined ? result.html : project.html,
+      css: result.css !== undefined ? result.css : project.css,
+      js: result.js !== undefined ? result.js : project.js,
+      chatHistory: [
+        ...history,
+        { role: "assistant", content: result.explanation || "Code updated.", timestamp: Date.now(), modelUsed: model }
+      ]
+    });
+    setPreviewKey((k) => k + 1);
+  } else {
+    const response = await callAI(prompt, { model });
+
+    const estimatedTokens = (prompt.length + response.length) / 4;
+    const costPerToken = 0.000001;
+    const estimatedCost = estimatedTokens * costPerToken;
+    updateTokenUsage(estimatedCost);
+
+    let result;
+    try {
+      const cleanResponse = response.replace(/```json\\n?/g, "").replace(/```\\n?/g, "").trim();
+      result = JSON.parse(cleanResponse);
+    } catch {
+      result = { explanation: response };
+    }
+    mergeProject({
+      html: result.html !== undefined ? result.html : project.html,
+      css: result.css !== undefined ? result.css : project.css,
+      js: result.js !== undefined ? result.js : project.js,
+      chatHistory: [
+        ...history,
+        { role: "assistant", content: result.explanation || "Code updated.", timestamp: Date.now(), modelUsed: model }
+      ]
+    });
+    setPreviewKey((k) => k + 1);
+  }
+} catch (error) {
+  console.error("AI generation error:", error);
+  mergeProject({
+    chatHistory: [
+      ...history,
+      { role: "assistant", content: "Generating code failed. Please try again.", timestamp: Date.now(), isError: true, modelUsed: model }
+    ]
+  });
+} finally {
+  setIsGenerating(false);
+  setStreamingMessage("");
+}
+
+```
+
+}, [chatInput, isGenerating, project, mergeProject, model, isPuterModel, isPollinationsModel, puterReady, updateTokenUsage, callPollinationsAPI]);
+
+const filteredPuterModels = useMemo(() => {
+if (!puterSearchText.trim()) {
+return settings?.puterModels || [];
+}
+const searchLower = puterSearchText.toLowerCase();
+return (settings?.puterModels || []).filter(name =>
+name.toLowerCase().includes(searchLower)
+);
+}, [settings, puterSearchText]);
+
+const appStyle = { backgroundColor: [themeVars.bg](http://themevars.bg/), color: themeVars.text, fontSize: `${textSize}px` };
+const headerStyle = {
+backgroundColor: themeVars.header,
+color: themeVars.text,
+borderBottom: `1px solid ${themeVars.border}`
+};
+const panelStyle = {
+backgroundColor: themeVars.panel,
+color: themeVars.text,
+borderColor: themeVars.border
+};
+const buttonClass = "px-3 py-2 text-sm";
+const iconBtn = "w-9 h-9 flex items-center justify-center border transition-all";
+const inputBase = {
+backgroundColor: themeVars.panel,
+color: themeVars.text,
+border: `1px solid ${themeVars.border}`
+};
+
+const smallIconBtn = "w-6 h-6 flex items-center justify-center text-[10px] border transition-all hover:opacity-80";
+
+if (isMobile) {
+return (
+<div className="h-screen flex flex-col overflow-hidden" style={appStyle}>
+<style>{ExtraCSS}</style>
+
+```
+    <header className="w-full flex-shrink-0" style={headerStyle}>
+      <div className="px-2 py-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div
+            className="w-6 h-6 flex items-center justify-center font-bold text-white text-[10px] flex-shrink-0"
+            style={{ backgroundColor: themeVars.primary }}
+          >
+            JR
+          </div>
+          <h1 className="text-sm font-bold truncate">JR Live Codes</h1>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {!username ? (
+            <button
+              onClick={handlePuterLogin}
+              className="w-7 h-7 flex items-center justify-center text-xs"
+              style={{ ...inputBase, color: "#2ecc71", borderRadius: 0 }}
+              disabled={!puterReady}
+              aria-label="Login"
+            >
+              ⎈
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowUserPopup(true)}
+              className="px-2 h-7 flex items-center justify-center text-xs font-semibold truncate max-w-[80px]"
+              style={inputBase}
+            >
+              {username}
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            className="w-7 h-7 flex items-center justify-center text-xs"
+            style={{ ...inputBase, borderRadius: 0 }}
+            aria-label="Save"
+          >
+            💾
+          </button>
+          <button
+            onClick={() => setIsProjectsOpen(true)}
+            className="w-7 h-7 flex items-center justify-center text-xs"
+            style={{ ...inputBase, borderRadius: 0 }}
+            aria-label="Projects"
+          >
+            ☰
+          </button>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="w-7 h-7 flex items-center justify-center text-xs"
+            style={{ ...inputBase, borderRadius: 0 }}
+            aria-label="Settings"
+          >
+            ⚙️
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col" style={{ ...panelStyle, borderBottom: `1px solid ${themeVars.border}` }}>
+        <div className="px-2 py-2 flex items-center justify-between flex-shrink-0" style={{ borderBottom: `1px solid ${themeVars.border}` }}>
+          <div className="text-xs font-semibold flex items-center gap-2">
+            <span>🤖 AI Chat</span>
+            {isPuterModel && (
+              <span className="text-[10px] px-2 py-0.5" style={{ border: `1px solid ${themeVars.border}`, backgroundColor: "transparent" }}>
+                Puter
+              </span>
+            )}
+            {isPollinationsModel && (
+              <span className="text-[10px] px-2 py-0.5" style={{ border: `1px solid ${themeVars.border}`, backgroundColor: "transparent" }}>
+                Pollinations
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => mergeProject({ chatHistory: [] })}
+            className="w-6 h-6 flex items-center justify-center text-xs"
+            style={{ ...inputBase, borderRadius: 0 }}
+            aria-label="Clear chat"
+          >
+            🗑
+          </button>
+        </div>
+
+        <div className="px-2 py-2 flex-shrink-0" style={{ borderBottom: `1px solid ${themeVars.border}` }}>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="w-full px-2 py-1 text-[11px]"
+            style={inputBase}
+          >
+            {Object.keys(availableModelGroups).length === 0 && (
+              <option value="">No models enabled</option>
+            )}
+            {Object.keys(availableModelGroups).map((grp) => (
+              <optgroup key={grp} label={grp}>
+                {availableModelGroups[grp].map((m) => (
+                  <option key={`${grp}|${m.value}`} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        {selectedElement && (
+          <div className="px-2 py-2 flex-shrink-0" style={{ borderBottom: `1px solid ${themeVars.border}`, backgroundColor: themeVars.bg }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold">Element Selected: {selectedElement.tagName}</div>
+              <button
+                onClick={() => setSelectedElement(null)}
+                className="w-5 h-5 flex items-center justify-center text-xs"
+                style={inputBase}
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-1 text-[10px]">
+              {selectedElement.id && <div>ID: {selectedElement.id}</div>}
+              {selectedElement.className && <div>Class: {selectedElement.className}</div>}
+              <div className="flex gap-1 flex-wrap mt-2">
+                <button className="px-2 py-1 text-[9px]" style={{ ...inputBase, fontSize: '9px' }}>Edit Text</button>
+                <button className="px-2 py-1 text-[9px]" style={{ ...inputBase, fontSize: '9px' }}>Change Color</button>
+                <button className="px-2 py-1 text-[9px]" style={{ ...inputBase, fontSize: '9px' }}>Resize</button>
+                <button className="px-2 py-1 text-[9px]" style={{ ...inputBase, fontSize: '9px' }}>Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div
+          ref={chatScrollRef}
+          className="flex-1 p-2 space-y-2 overflow-y-auto no-scrollbar"
+        >
+          {(project.chatHistory || []).length === 0 && (
+            <div className="text-[10px] opacity-70">
+              Ask AI to modify your code...
+            </div>
+          )}
+          {(project.chatHistory || []).map((m, i) => {
+            const messageId = `msg-${i}`;
+            const isCollapsed = collapsedMessages.has(messageId);
+            const isEditing = editingMessageId === i;
+
+            return (
+              <div key={i} className="space-y-1">
+                {m.role === "assistant" && m.modelUsed && (
+                  <div className="text-[9px] opacity-60">
+                    {m.modelUsed} • {new Date(m.timestamp).toLocaleTimeString()}
+                  </div>
+                )}
+                <div
+                  className={`px-2 py-1.5 text-[11px] ${m.role === "user" ? "ml-6" : "mr-6"} cursor-pointer`}
+                  style={{
+                    backgroundColor:
+                      m.role === "user"
+                        ? themeVars.primary
+                        : m.isError
+                          ? themeVars.danger
+                          : themeVars.bg,
+                    color: m.role === "user" ? "#fff" : themeVars.text,
+                    border: `1px solid ${themeVars.border}`
+                  }}
+                  onClick={() => !isEditing && toggleMessageCollapse(messageId)}
+                >
+                  {isEditing ? (
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="w-full p-1 text-[11px]"
+                      style={inputBase}
+                      rows={3}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div className={`whitespace-pre-wrap break-words ${isCollapsed ? "line-clamp-1" : ""}`}>
+                      {m.content}
+                    </div>
+                  )}
+                </div>
+
+                <div className={`flex gap-1 ${m.role === "user" ? "justify-end mr-6" : "ml-0 mr-6"}`}>
+                  {m.role === "user" && (
+                    <>
+                      <button
+                        onClick={() => handleResendMessage(m.content)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Resend"
+                      >
+                        ↻
+                      </button>
+                      {isEditing ? (
+                        <button
+                          onClick={() => handleSaveEdit(i)}
+                          className={smallIconBtn}
+                          style={{ ...inputBase, backgroundColor: themeVars.success, color: "#fff" }}
+                          title="Save"
+                        >
+                          ✓
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStartEdit(i, m.content)}
+                          className={smallIconBtn}
+                          style={inputBase}
+                          title="Edit"
+                        >
+                          ✎
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleCopyMessage(m.content)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Copy"
+                      >
+                        📋
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMessage(i)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Delete"
+                      >
+                        🗑
+                      </button>
+                    </>
+                  )}
+
+                  {m.role === "assistant" && (
+                    <>
+                      <button
+                        onClick={() => handleRedoMessage(i)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Redo"
+                      >
+                        ⟳
+                      </button>
+                      <button
+                        onClick={() => handleCopyMessage(m.content)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Copy"
+                      >
+                        📋
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMessage(i)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Delete"
+                      >
+                        🗑
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {isGenerating && (
+            <div
+              className="px-2 py-1.5 text-[11px] ai-pulse mr-6"
+              style={{
+                borderWidth: 2,
+                borderColor: themeVars.primary,
+                background: themeVars.bg
+              }}
+            >
+              Generating...
+            </div>
+          )}
+        </div>
+
+        <form
+          onSubmit={handleAIGenerate}
+          className="p-2 flex gap-1 flex-shrink-0"
+          style={{ borderTop: `1px solid ${themeVars.border}` }}
+        >
+          <input
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            className="flex-1 px-2 py-1.5 text-[11px] min-w-0"
+            style={inputBase}
+            placeholder="Ask AI..."
+            disabled={isGenerating}
+          />
+          <button
+            type="submit"
+            disabled={isGenerating || !chatInput.trim()}
+            className="w-9 h-9 flex items-center justify-center text-sm flex-shrink-0"
+            style={{
+              backgroundColor: themeVars.primary,
+              color: "#fff",
+              border: `1px solid ${themeVars.primary}`,
+              opacity: isGenerating || !chatInput.trim() ? 0.6 : 1
+            }}
+            aria-label="Send"
+          >
+            ➤
+          </button>
+        </form>
+      </div>
+
+      <div className="flex-1 flex flex-col" style={{ ...panelStyle, borderBottom: `1px solid ${themeVars.border}` }}>
+        <div className="px-2 py-2 flex items-center justify-between flex-shrink-0" style={{ borderBottom: `1px solid ${themeVars.border}` }}>
+          <div className="text-xs font-semibold">📝 Editor</div>
+          <button
+            onClick={runPreview}
+            className="text-[10px] px-2 py-1 font-semibold"
+            style={{
+              backgroundColor: themeVars.success,
+              color: "#fff"
+            }}
+          >
+            ▶ Run
+          </button>
+        </div>
+
+        <div className="flex overflow-x-auto flex-shrink-0 no-scrollbar" style={{ borderBottom: `1px solid ${themeVars.border}` }}>
+          {["html", "css", "js"].map((t) => (
+            <button
+              key={t}
+              onClick={() => setActiveTab(t)}
+              className="px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap flex-shrink-0"
+              style={{
+                backgroundColor: activeTab === t ? themeVars.primary : themeVars.panel,
+                color: activeTab === t ? "#fff" : themeVars.text,
+                borderRight: `1px solid ${themeVars.border}`
+              }}
+            >
+              {t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 p-2 overflow-hidden">
+          <textarea
+            value={project[activeTab] || ""}
+            onChange={(e) => mergeProject({ [activeTab]: e.target.value })}
+            spellCheck={false}
+            className="w-full h-full text-[10px] p-2"
+            style={{
+              color: themeVars.text,
+              border: `1px solid ${themeVars.border}`,
+              backgroundColor: themeVars.bg,
+              fontFamily: "\\"SFMono-Regular\\", Consolas, Menlo, monospace",
+              resize: "none"
+            }}
+            placeholder={`Enter ${activeTab.toUpperCase()} here`}
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col" style={panelStyle}>
+        <div className="px-2 py-2 flex items-center justify-between flex-shrink-0" style={{ borderBottom: `1px solid ${themeVars.border}` }}>
+          <div className="text-xs font-semibold">👁 Preview</div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={enableElementSelectMode}
+              className="w-6 h-6 flex items-center justify-center text-xs"
+              style={{
+                ...inputBase,
+                backgroundColor: elementSelectMode ? themeVars.primary : 'transparent',
+                color: elementSelectMode ? '#fff' : themeVars.text
+              }}
+              title={elementSelectMode ? "Disable Element Select" : "Enable Element Select"}
+            >
+              🎯
+            </button>
+            <button
+              onClick={runPreview}
+              className="w-6 h-6 flex items-center justify-center text-xs"
+              style={inputBase}
+            >
+              ↻
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <iframe
+            ref={iframeRef}
+            key={previewKey}
+            srcDoc={previewHTML}
+            className="w-full h-full"
+            sandbox="allow-scripts allow-same-origin"
+            title="preview"
+          />
+        </div>
+      </div>
+    </div>
+
+    {showUserPopup && username && (
+      <div
+        className="fixed inset-0 z-50"
+        style={{ background: "rgba(0,0,0,0.5)" }}
+        onClick={() => setShowUserPopup(false)}
+      >
+        <div
+          className="absolute bottom-0 left-0 right-0 max-h-[70vh] flex flex-col slide-up"
+          style={{
+            backgroundColor: themeVars.panel,
+            color: themeVars.text,
+            borderTop: `2px solid ${themeVars.border}`
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${themeVars.border}` }}>
+            <div className="font-semibold text-sm">User: {username}</div>
+            <button
+              onClick={() => setShowUserPopup(false)}
+              className="w-7 h-7 flex items-center justify-center"
+              style={inputBase}
+            >
+              ×
+            </button>
+          </div>
+          <div className="p-4 overflow-y-auto">
+            <div className="mb-3">
+              <div className="text-xs font-semibold mb-2">Token Usage</div>
+              <div className="flex justify-between text-xs mb-1">
+                <span>Used: ${(settings?.userUsedTokens || 0).toFixed(4)}</span>
+                <span>Total: ${(settings?.puterTokenAmount || 0).toFixed(2)}</span>
+              </div>
+              <div
+                className="w-full h-4"
+                style={{ backgroundColor: themeVars.bg, border: `1px solid ${themeVars.border}` }}
+              >
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${tokenUsedPercent}%`,
+                    backgroundColor: tokenUsedPercent > 80 ? themeVars.danger : tokenUsedPercent > 50 ? themeVars.warn : themeVars.success
+                  }}
+                />
+              </div>
+              <div className="text-xs text-center mt-1">{tokenUsedPercent.toFixed(1)}% Used</div>
+            </div>
+
+            {settings?.previousUsers && settings.previousUsers.length > 0 && (
+              <div className="mb-3">
+                <div className="text-xs font-semibold mb-2">Previous Users</div>
+                <div className="space-y-1 max-h-32 overflow-y-auto no-scrollbar">
+                  {settings.previousUsers.map((user, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => switchUser(user)}
+                      className="w-full text-left px-2 py-1 text-xs"
+                      style={{
+                        backgroundColor: user === username ? themeVars.primary : themeVars.bg,
+                        color: user === username ? "#fff" : themeVars.text,
+                        border: `1px solid ${themeVars.border}`
+                      }}
+                    >
+                      {user}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handlePuterLogout}
+              className="w-full px-3 py-2 text-sm"
+              style={{
+                backgroundColor: themeVars.danger,
+                color: "#fff"
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {isProjectsOpen && (
+      <div
+        className="fixed inset-0 z-50"
+        style={{ background: "rgba(0,0,0,0.5)" }}
+        onClick={() => setIsProjectsOpen(false)}
+      >
+        <div
+          className="absolute bottom-0 left-0 right-0 max-h-[80vh] flex flex-col slide-up"
+          style={{
+            backgroundColor: themeVars.panel,
+            color: themeVars.text,
+            borderTop: `2px solid ${themeVars.border}`
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="px-4 py-3 flex items-center justify-between"
+            style={{ borderBottom: `1px solid ${themeVars.border}` }}
+          >
+            <div className="font-semibold">Projects</div>
+            <button
+              onClick={() => setIsProjectsOpen(false)}
+              className="px-3 py-1 text-sm"
+              style={{
+                backgroundColor: themeVars.danger,
+                color: "#fff"
+              }}
+            >
+              Close
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto p-2">
+            {projects.length === 0 ? (
+              <div className="p-4 text-xs opacity-70 text-center">
+                No saved projects yet.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {projects
+                  .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                  .map((p) => (
+                    <button
+                      key={p._id}
+                      onClick={() => loadProject(p)}
+                      className="w-full text-left px-3 py-2 text-sm"
+                      style={{
+                        border: `1px solid ${themeVars.border}`,
+                        backgroundColor: themeVars.bg
+                      }}
+                    >
+                      <div className="font-semibold truncate">
+                        {p.title || "Untitled"}
+                      </div>
+                      <div className="text-xs opacity-70">
+                        {p.updatedAt
+                          ? new Date(p.updatedAt).toLocaleString()
+                          : ""}
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {settingsOpen && (
+      <div
+        className="fixed inset-0 z-50 overflow-y-auto"
+        style={{ background: "rgba(0,0,0,0.5)" }}
+        onClick={() => setSettingsOpen(false)}
+      >
+        <div
+          className="min-h-screen p-4 flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="w-full max-w-md flex flex-col max-h-[90vh]"
+            style={{
+              backgroundColor: themeVars.panel,
+              color: themeVars.text,
+              border: `1px solid ${themeVars.border}`
+            }}
+          >
+            <div
+              className="px-4 py-3 flex items-center justify-between"
+              style={{ borderBottom: `1px solid ${themeVars.border}` }}
+            >
+              <div className="font-semibold">Settings</div>
+              <button
+                onClick={() => setSettingsOpen(false)}
+                className="w-8 h-8 flex items-center justify-center"
+                style={inputBase}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex" style={{ borderBottom: `1px solid ${themeVars.border}` }}>
+              {["AI", "UI"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setSettingsTab(t)}
+                  className="flex-1 py-2 text-sm"
+                  style={{
+                    backgroundColor:
+                      settingsTab === t ? themeVars.primary : themeVars.panel,
+                    color: settingsTab === t ? "#fff" : themeVars.text,
+                    borderRight: t === "AI" ? `1px solid ${themeVars.border}` : "none"
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 p-4 overflow-y-auto">
+              {settingsTab === "UI" && (
+                <div className="space-y-4">
+                  <div>
+                    <div className="font-semibold mb-2">Theme</div>
+                    <div className="space-y-2">
+                      {["Light", "Dark", "Grey", "Sunshine", "Multicoloured"].map((t) => (
+                        <label
+                          key={t}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <input
+                            type="radio"
+                            name="theme"
+                            value={t}
+                            checked={(settings && settings.theme) === t}
+                            onChange={() => mergeSettings({ theme: t })}
+                          />
+                          <span className="text-sm">{t}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="font-semibold mb-2">Text Size: {textSize}px</div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="24"
+                      step="1"
+                      value={textSize}
+                      onChange={(e) => mergeSettings({ textSize: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="font-semibold mb-2">Token Settings</div>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs mb-1">Budget ($)</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={tempPuterTokenAmount}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || /^\\d*\\.?\\d*$/.test(val)) {
+                              setTempPuterTokenAmount(val);
+                            }
+                          }}
+                          className="w-full px-2 py-2 text-sm"
+                          style={inputBase}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs mb-1">Used ($)</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={tempUserUsedTokens}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || /^\\d*\\.?\\d*$/.test(val)) {
+                              setTempUserUsedTokens(val);
+                            }
+                          }}
+                          className="w-full px-2 py-2 text-sm"
+                          style={inputBase}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <button
+                        onClick={saveTokenSettings}
+                        className="w-full px-3 py-2 text-sm"
+                        style={{
+                          backgroundColor: themeVars.success,
+                          color: "#fff"
+                        }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {settingsTab === "AI" && (
+                <div className="space-y-4">
+                  <div>
+                    <button
+                      onClick={() => setModelsExpanded(!modelsExpanded)}
+                      className="w-full flex items-center justify-between p-2"
+                      style={{ border: `1px solid ${themeVars.border}` }}
+                    >
+                      <span className="font-semibold text-sm">Selectable Models</span>
+                      <span className="text-xs">{modelsExpanded ? "▼" : "▶"}</span>
+                    </button>
+
+                    {modelsExpanded && (
+                      <div className="mt-2 space-y-3 max-h-[300px] overflow-y-auto">
+                        {Array.from(new Set(baseModels.map((m) => m.group))).map((grp) => (
+                          <div
+                            key={grp}
+                            className="p-2"
+                            style={{ border: `1px solid ${themeVars.border}` }}
+                          >
+                            <div className="font-semibold text-sm mb-2">{grp}</div>
+                            <div className="space-y-1">
+                              {baseModels
+                                .filter((m) => m.group === grp)
+                                .map((m) => {
+                                  const k = `${m.group}|${m.value}`;
+                                  const checked = !!(
+                                    (settings &&
+                                      settings.enabledMap &&
+                                      settings.enabledMap[k]) ||
+                                    false
+                                  );
+                                  return (
+                                    <label
+                                      key={k}
+                                      className="flex items-center gap-2 text-xs"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() =>
+                                          toggleModelEnabled(m.group, m.value)
+                                        }
+                                      />
+                                      <span>{m.label}</span>
+                                    </label>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <button
+                      onClick={() => setPuterSectionExpanded(!puterSectionExpanded)}
+                      className="w-full flex items-center justify-between p-2 mb-2"
+                      style={{ border: `1px solid ${themeVars.border}` }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={!!(settings && settings.puterEnabled)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            mergeSettings({ puterEnabled: e.target.checked });
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className="font-semibold text-sm">Enable Puter</span>
+                      </div>
+                      <span className="text-xs">{puterSectionExpanded ? "▼" : "▶"}</span>
+                    </button>
+
+                    {puterSectionExpanded && (
+                      <div className="space-y-2">
+                        <button
+                          onClick={refreshPuterModels}
+                          className="w-full px-3 py-2 text-sm"
+                          style={{
+                            backgroundColor: themeVars.primary,
+                            color: "#fff"
+                          }}
+                        >
+                          {loadingPuterModels ? "Refreshing..." : "Refresh Puter Models"}
+                        </button>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={selectAllPuterModels}
+                            className="flex-1 px-2 py-1 text-xs"
+                            style={{
+                              backgroundColor: themeVars.success,
+                              color: "#fff"
+                            }}
+                          >
+                            Select All
+                          </button>
+                          <button
+                            onClick={deselectAllPuterModels}
+                            className="flex-1 px-2 py-1 text-xs"
+                            style={{
+                              backgroundColor: themeVars.warn,
+                              color: "#fff"
+                            }}
+                          >
+                            Deselect All
+                          </button>
+                        </div>
+
+                        <input
+                          type="text"
+                          placeholder="Search models..."
+                          value={puterSearchText}
+                          onChange={(e) => setPuterSearchText(e.target.value)}
+                          className="w-full px-2 py-2 text-xs"
+                          style={inputBase}
+                        />
+
+                        <div
+                          className="p-2 max-h-40 overflow-y-auto"
+                          style={{ border: `1px solid ${themeVars.border}` }}
+                        >
+                          <div className="space-y-1">
+                            {filteredPuterModels.map((name) => {
+                              const k = `Puter|${name}`;
+                              const checked = !!(
+                                (settings &&
+                                  settings.enabledMap &&
+                                  settings.enabledMap[k]) ||
+                                false
+                              );
+                              return (
+                                <label
+                                  key={k}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleModelEnabled("Puter", name)}
+                                  />
+                                  <span>{name}</span>
+                                </label>
+                              );
+                            })}
+                            {filteredPuterModels.length === 0 && (
+                              <div className="text-xs opacity-70 text-center py-2">
+                                {puterSearchText.trim() ? "No matching models" : "No Puter models loaded"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <button
+                      onClick={() => setPollinationsSectionExpanded(!pollinationsSectionExpanded)}
+                      className="w-full flex items-center justify-between p-2 mb-2"
+                      style={{ border: `1px solid ${themeVars.border}` }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={!!(settings && settings.pollinationsEnabled)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            mergeSettings({ pollinationsEnabled: e.target.checked });
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className="font-semibold text-sm">Enable Pollinations</span>
+                      </div>
+                      <span className="text-xs">{pollinationsSectionExpanded ? "▼" : "▶"}</span>
+                    </button>
+
+                    {pollinationsSectionExpanded && (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={selectAllPollinationsModels}
+                            className="flex-1 px-2 py-1 text-xs"
+                            style={{
+                              backgroundColor: themeVars.success,
+                              color: "#fff"
+                            }}
+                          >
+                            Select All
+                          </button>
+                          <button
+                            onClick={deselectAllPollinationsModels}
+                            className="flex-1 px-2 py-1 text-xs"
+                            style={{
+                              backgroundColor: themeVars.warn,
+                              color: "#fff"
+                            }}
+                          >
+                            Deselect All
+                          </button>
+                        </div>
+
+                        <div
+                          className="p-2 max-h-40 overflow-y-auto"
+                          style={{ border: `1px solid ${themeVars.border}` }}
+                        >
+                          <div className="space-y-1">
+                            {pollinationsModels.map((name) => {
+                              const k = `Pollinations|${name}`;
+                              const checked = !!(
+                                (settings &&
+                                  settings.enabledMap &&
+                                  settings.enabledMap[k]) ||
+                                false
+                              );
+                              return (
+                                <label
+                                  key={k}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleModelEnabled("Pollinations", name)}
+                                  />
+                                  <span>{name}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div
+              className="px-4 py-3"
+              style={{ borderTop: `1px solid ${themeVars.border}` }}
+            >
+              <button
+                onClick={() => setSettingsOpen(false)}
+                className="w-full px-3 py-2 text-sm"
+                style={{
+                  backgroundColor: themeVars.primary,
+                  color: "#fff"
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+);
+
+```
+
+}
+
+// Desktop version continues with same pattern...
+return (
+<div className="min-h-screen flex flex-col" style={appStyle}>
+<style>{ExtraCSS}</style>
+
+```
+  <header className="w-full" style={headerStyle}>
+    <div className="max-w-[1600px] mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <div
+          className="w-8 h-8 flex items-center justify-center font-bold text-white"
+          style={{ backgroundColor: themeVars.primary }}
+        >
+          JR
+        </div>
+        <h1 className="text-[24px] font-bold tracking-tight">JR Live Codes</h1>
+        <input
+          value={project.title || ""}
+          onChange={(e) => mergeProject({ title: e.target.value })}
+          className="ml-3 px-3 py-2 text-sm"
+          style={inputBase}
+          placeholder="Project name"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        {!username ? (
+          <button
+            onClick={handlePuterLogin}
+            className={iconBtn}
+            style={{ ...inputBase, color: "#2ecc71", borderRadius: 0 }}
+            disabled={!puterReady}
+            title={puterReady ? "Login with Puter" : "Loading Puter"}
+            aria-label="Puter login"
+          >
+            ⎈
+          </button>
+        ) : (
+          <div className="relative">
+            <div
+              className="text-sm px-3 py-2 cursor-pointer"
+              style={{ border: `1px solid ${themeVars.border}` }}
+              onMouseEnter={() => setShowUserPopup(true)}
+              onMouseLeave={() => setShowUserPopup(false)}
+              onClick={() => setShowUserPopup(!showUserPopup)}
+            >
+              {username}
+            </div>
+            {showUserPopup && (
+              <div
+                className="absolute top-full right-0 mt-1 w-64 p-4 z-50"
+                style={{
+                  backgroundColor: themeVars.panel,
+                  border: `1px solid ${themeVars.border}`,
+                  boxShadow: "0 4px 6px rgba(0,0,0,0.2)"
+                }}
+                onMouseEnter={() => setShowUserPopup(true)}
+                onMouseLeave={() => setShowUserPopup(false)}
+              >
+                <div className="text-xs font-semibold mb-2">Token Usage</div>
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>Used: ${(settings?.userUsedTokens || 0).toFixed(4)}</span>
+                    <span>Total: ${(settings?.puterTokenAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div
+                    className="w-full h-4"
+                    style={{ backgroundColor: themeVars.bg, border: `1px solid ${themeVars.border}` }}
+                  >
+                    <div
+                      className="h-full transition-all"
+                      style={{
+                        width: `${tokenUsedPercent}%`,
+                        backgroundColor: tokenUsedPercent > 80 ? themeVars.danger : tokenUsedPercent > 50 ? themeVars.warn : themeVars.success
+                      }}
+                    />
+                  </div>
+                  <div className="text-xs text-center mt-1">{tokenUsedPercent.toFixed(1)}% Used</div>
+                </div>
+
+                {settings?.previousUsers && settings.previousUsers.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-semibold mb-2">Previous Users</div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto no-scrollbar">
+                      {settings.previousUsers.map((user, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => switchUser(user)}
+                          className="w-full text-left px-2 py-1 text-xs hover:opacity-80 transition-all"
+                          style={{
+                            backgroundColor: user === username ? themeVars.primary : themeVars.bg,
+                            color: user === username ? "#fff" : themeVars.text,
+                            border: `1px solid ${themeVars.border}`
+                          }}
+                        >
+                          {user}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handlePuterLogout}
+                  className="w-full px-3 py-2 text-sm"
+                  style={{
+                    backgroundColor: themeVars.danger,
+                    color: "#fff",
+                    border: `1px solid ${themeVars.danger}`
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <button
+          onClick={handleSave}
+          className={iconBtn}
+          style={{ ...inputBase, borderRadius: 0 }}
+          title="Save"
+          aria-label="Save"
+        >
+          💾
+        </button>
+        <button
+          onClick={handleNew}
+          className={iconBtn}
+          style={{ ...inputBase, borderRadius: 0 }}
+          title="New"
+          aria-label="New"
+        >
+          ＋
+        </button>
+        <button
+          onClick={() => setIsProjectsOpen((v) => !v)}
+          className={iconBtn}
+          style={{ ...inputBase, borderRadius: 0 }}
+          title="Projects"
+          aria-label="Projects"
+        >
+          ☰
+        </button>
+        <button
+          onClick={runPreview}
+          className={iconBtn}
+          style={{ ...inputBase, borderRadius: 0 }}
+          title="Run"
+          aria-label="Run"
+        >
+          ▶
+        </button>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className={iconBtn}
+          style={{ ...inputBase, borderRadius: 0 }}
+          title="Settings"
+          aria-label="Settings"
+        >
+          ⚙️
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div ref={containerRef} className="flex-1 w-full relative overflow-hidden">
+    <div className="absolute inset-0 flex">
+      <aside
+        className="h-full flex flex-col"
+        style={{
+          ...panelStyle,
+          width: `${chatW}%`,
+          minWidth: 0,
+          borderRight: `1px solid ${themeVars.border}`
+        }}
+      >
+        <div
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ borderBottom: `1px solid ${themeVars.border}` }}
+        >
+          <div className="text-[18px] font-semibold flex items-center gap-2">
+            <span>AI Chat</span>
+            {isPuterModel && (
+              <span className="text-xs px-2 py-1" style={{ border: `1px solid ${themeVars.border}`, backgroundColor: "transparent" }}>
+                Puter
+              </span>
+            )}
+            {isPollinationsModel && (
+              <span className="text-xs px-2 py-1" style={{ border: `1px solid ${themeVars.border}`, backgroundColor: "transparent" }}>
+                Pollinations
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => mergeProject({ chatHistory: [] })}
+            className={iconBtn}
+            style={{ ...inputBase, borderRadius: 0 }}
+            aria-label="Clear chat"
+          >
+            🗑
+          </button>
+        </div>
+
+        <div
+          className="px-4 py-3"
+          style={{ borderBottom: `1px solid ${themeVars.border}` }}
+        >
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="w-full px-2 py-2 text-sm"
+            style={inputBase}
+          >
+            {Object.keys(availableModelGroups).length === 0 && (
+              <option value="">No models enabled</option>
+            )}
+            {Object.keys(availableModelGroups).map((grp) => (
+              <optgroup key={grp} label={grp}>
+                {availableModelGroups[grp].map((m) => (
+                  <option key={`${grp}|${m.value}`} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        {selectedElement && (
+          <div className="px-4 py-3" style={{ borderBottom: `1px solid ${themeVars.border}`, backgroundColor: themeVars.bg }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-semibold">Selected: {selectedElement.tagName}</div>
+              <button
+                onClick={() => setSelectedElement(null)}
+                className="w-6 h-6 flex items-center justify-center text-xs"
+                style={inputBase}
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-2 text-xs">
+              {selectedElement.id && <div>ID: {selectedElement.id}</div>}
+              {selectedElement.className && <div>Class: {selectedElement.className}</div>}
+              <div className="flex gap-2 flex-wrap mt-3">
+                <button className="px-3 py-1 text-xs" style={inputBase}>Edit Text</button>
+                <button className="px-3 py-1 text-xs" style={inputBase}>Change Color</button>
+                <button className="px-3 py-1 text-xs" style={inputBase}>Resize</button>
+                <button className="px-3 py-1 text-xs" style={{ ...inputBase, backgroundColor: themeVars.danger, color: '#fff' }}>Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div
+          ref={chatScrollRef}
+          className="flex-1 p-4 space-y-3 overflow-y-auto no-scrollbar"
+        >
+          {(project.chatHistory || []).length === 0 && (
+            <div className="text-xs opacity-70">
+              Try prompts like: Create a hero section, Add a pricing table.
+            </div>
+          )}
+          {(project.chatHistory || []).map((m, i) => {
+            const messageId = `msg-${i}`;
+            const isCollapsed = collapsedMessages.has(messageId);
+            const isEditing = editingMessageId === i;
+
+            return (
+              <div key={i} className="space-y-1">
+                {m.role === "assistant" && m.modelUsed && (
+                  <div className="text-[10px] opacity-60">
+                    {m.modelUsed} • {new Date(m.timestamp).toLocaleTimeString()}
+                  </div>
+                )}
+                <div
+                  className={`max-w-[92%] px-3 py-2 text-sm cursor-pointer ${m.role === "user" ? "ml-auto" : ""}`}
+                  style={{
+                    backgroundColor:
+                      m.role === "user"
+                        ? themeVars.primary
+                        : m.isError
+                          ? themeVars.danger
+                          : themeVars.bg,
+                    color: m.role === "user" ? "#fff" : themeVars.text,
+                    border: `1px solid ${themeVars.border}`
+                  }}
+                  onClick={() => !isEditing && toggleMessageCollapse(messageId)}
+                >
+                  {isEditing ? (
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="w-full p-2 text-sm"
+                      style={inputBase}
+                      rows={3}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div className={`whitespace-pre-wrap ${isCollapsed ? "line-clamp-1" : ""}`}>{m.content}</div>
+                  )}
+                </div>
+
+                <div className={`flex gap-1 ${m.role === "user" ? "justify-end" : ""}`}>
+                  {m.role === "user" && (
+                    <>
+                      <button
+                        onClick={() => handleResendMessage(m.content)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Resend"
+                      >
+                        ↻
+                      </button>
+                      {isEditing ? (
+                        <button
+                          onClick={() => handleSaveEdit(i)}
+                          className={smallIconBtn}
+                          style={{ ...inputBase, backgroundColor: themeVars.success, color: "#fff" }}
+                          title="Save"
+                        >
+                          ✓
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStartEdit(i, m.content)}
+                          className={smallIconBtn}
+                          style={inputBase}
+                          title="Edit"
+                        >
+                          ✎
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleCopyMessage(m.content)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Copy"
+                      >
+                        📋
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMessage(i)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Delete"
+                      >
+                        🗑
+                      </button>
+                    </>
+                  )}
+
+                  {m.role === "assistant" && (
+                    <>
+                      <button
+                        onClick={() => handleRedoMessage(i)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Redo"
+                      >
+                        ⟳
+                      </button>
+                      <button
+                        onClick={() => handleCopyMessage(m.content)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Copy"
+                      >
+                        📋
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMessage(i)}
+                        className={smallIconBtn}
+                        style={inputBase}
+                        title="Delete"
+                      >
+                        🗑
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {isGenerating && (
+            <div
+              className="max-w-[92%] px-3 py-2 text-sm ai-pulse"
+              style={{
+                borderWidth: 2,
+                borderColor: themeVars.primary,
+                background: themeVars.bg
+              }}
+            >
+              Generating code...
+            </div>
+          )}
+        </div>
+
+        <form
+          onSubmit={handleAIGenerate}
+          className="p-4 flex gap-2"
+          style={{ borderTop: `1px solid ${themeVars.border}` }}
+        >
+          <input
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            className="flex-1 px-3 py-2 text-sm"
+            style={inputBase}
+            placeholder="Ask AI to modify your code..."
+            disabled={isGenerating}
+          />
+          <button
+            type="submit"
+            disabled={isGenerating || !chatInput.trim()}
+            className={iconBtn}
+            style={{
+              backgroundColor: themeVars.primary,
+              color: "#fff",
+              border: `1px solid ${themeVars.primary}`,
+              opacity: isGenerating || !chatInput.trim() ? 0.6 : 1
+            }}
+            aria-label="Send"
+          >
+            ➤
+          </button>
+        </form>
+      </aside>
+
+      <div
+        onMouseDown={() => setDragging("left")}
+        className="h-full"
+        style={{ width: 6, cursor: "col-resize", background: themeVars.border }}
+        title="Drag to resize"
+      />
+
+      <section
+        className="h-full flex flex-col relative"
+        style={{
+          ...panelStyle,
+          width: `${editorW}%`,
+          minWidth: 0,
+          borderRight: `1px solid ${themeVars.border}`
+        }}
+      >
+        <div
+          className="px-4 py-2 flex items-center gap-2"
+          style={{ borderBottom: `1px solid ${themeVars.border}` }}
+        >
+          {["html", "css", "js"].map((t) => (
+            <button
+              key={t}
+              onClick={() => setActiveTab(t)}
+              className={buttonClass}
+              style={{
+                backgroundColor:
+                  activeTab === t ? themeVars.primary : themeVars.panel,
+                color: activeTab === t ? "#fff" : themeVars.text,
+                border: `1px solid ${themeVars.border}`
+              }}
+            >
+              {t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-hidden p-4">
+          <textarea
+            value={project[activeTab] || ""}
+            onChange={(e) => mergeProject({ [activeTab]: e.target.value })}
+            spellCheck={false}
+            className="w-full h-full bg-transparent text-sm"
+            style={{
+              color: themeVars.text,
+              border: `1px solid ${themeVars.border}`,
+              backgroundColor: themeVars.bg,
+              fontFamily: "\\"SFMono-Regular\\", Consolas, Menlo, monospace"
+            }}
+            placeholder={`Enter ${activeTab.toUpperCase()} here`}
+          />
+        </div>
+
+        {isProjectsOpen && (
+          <div
+            className="absolute inset-y-0 right-0 w-[320px] flex flex-col"
+            style={{
+              backgroundColor: themeVars.panel,
+              color: themeVars.text,
+              borderLeft: `1px solid ${themeVars.border}`
+            }}
+          >
+            <div
+              className="px-4 py-3 flex items-center justify-between"
+              style={{ borderBottom: `1px solid ${themeVars.border}` }}
+            >
+              <div className="font-semibold">Projects</div>
+              <button
+                onClick={() => setIsProjectsOpen(false)}
+                className={buttonClass}
+                style={{
+                  backgroundColor: themeVars.danger,
+                  color: "#fff",
+                  border: `1px solid ${themeVars.danger}`
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {projects.length === 0 ? (
+                <div className="p-4 text-xs opacity-70">
+                  No saved projects yet.
+                </div>
+              ) : (
+                <div className="p-2 space-y-2">
+                  {projects
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    .map((p) => (
+                      <button
+                        key={p._id}
+                        onClick={() => loadProject(p)}
+                        className="w-full text-left px-3 py-2 text-sm"
+                        style={{
+                          border: `1px solid ${themeVars.border}`,
+                          backgroundColor: themeVars.bg
+                        }}
+                      >
+                        <div className="font-semibold truncate">
+                          {p.title || "Untitled"}
+                        </div>
+                        <div className="text-[11px]" style={{ opacity: 0.7 }}>
+                          {p.updatedAt
+                            ? new Date(p.updatedAt).toLocaleString()
+                            : ""}
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div
+        onMouseDown={() => setDragging("right")}
+        className="h-full"
+        style={{ width: 6, cursor: "col-resize", background: themeVars.border }}
+        title="Drag to resize"
+      />
+
+      <section
+        className="h-full flex flex-col"
+        style={{ ...panelStyle, width: `${previewW}%`, minWidth: 0 }}
+      >
+        <div
+          className="px-4 py-2 flex items-center gap-2"
+          style={{ borderBottom: `1px solid ${themeVars.border}` }}
+        >
+          <div className="text-sm font-semibold">Preview</div>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={enableElementSelectMode}
+              className={iconBtn}
+              style={{
+                ...inputBase,
+                borderRadius: 0,
+                backgroundColor: elementSelectMode ? themeVars.primary : themeVars.panel,
+                color: elementSelectMode ? '#fff' : themeVars.text
+              }}
+              title={elementSelectMode ? "Disable Element Select (click to turn off)" : "Enable Element Select (click to turn on)"}
+              aria-label="Element Select"
+            >
+              🎯
+            </button>
+            <button
+              onClick={runPreview}
+              className={iconBtn}
+              style={{ ...inputBase, borderRadius: 0 }}
+              title="Refresh"
+              aria-label="Refresh"
+            >
+              ↻
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  const blob = new Blob([previewHTML], { type: "text/html" });
+                  const url = URL.createObjectURL(blob);
+                  window.open(url, "_blank", "noopener,noreferrer");
+                  setTimeout(() => URL.revokeObjectURL(url), 30000);
+                } catch { }
+              }}
+              className={iconBtn}
+              style={{ ...inputBase, borderRadius: 0 }}
+              title="Open in new tab"
+              aria-label="Open in new tab"
+            >
+              🗗
+            </button>
+          </div>
+        </div>
+        <div className="flex-1">
+          <iframe
+            ref={iframeRef}
+            key={previewKey}
+            srcDoc={previewHTML}
+            className="w-full h-full"
+            sandbox="allow-scripts allow-same-origin"
+            title="preview"
+          />
+        </div>
+      </section>
+    </div>
+  </div>
+
+  {settingsOpen && (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: "rgba(0,0,0,0.35)" }}
+      onClick={() => setSettingsOpen(false)}
+    >
+      <div
+        className="w-full max-w-4xl flex flex-col"
+        style={{
+          backgroundColor: themeVars.panel,
+          color: themeVars.text,
+          border: `1px solid ${themeVars.border}`,
+          maxHeight: "90vh"
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ borderBottom: `1px solid ${themeVars.border}` }}
+        >
+          <div className="text-lg font-semibold">Settings</div>
+          <button
+            className={iconBtn}
+            style={{ ...inputBase, borderRadius: 0 }}
+            onClick={() => setSettingsOpen(false)}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          className="px-4 py-2"
+          style={{ borderBottom: `1px solid ${themeVars.border}` }}
+        >
+          {["AI", "UI"].map((t) => (
+            <button
+              key={t}
+              onClick={() => setSettingsTab(t)}
+              className={buttonClass}
+              style={{
+                backgroundColor:
+                  settingsTab === t ? themeVars.primary : themeVars.panel,
+                color: settingsTab === t ? "#fff" : themeVars.text,
+                border: `1px solid ${themeVars.border}`,
+                marginRight: 8
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 p-4 overflow-y-auto no-scrollbar">
+          {settingsTab === "UI" && (
+            <div className="space-y-4">
+              <div className="font-semibold">Theme</div>
+              <div className="grid grid-cols-2 gap-3">
+                {["Light", "Dark", "Grey", "Sunshine", "Multicoloured"].map(
+                  (t) => (
+                    <label
+                      key={t}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="theme"
+                        value={t}
+                        checked={(settings && settings.theme) === t}
+                        onChange={() => mergeSettings({ theme: t })}
+                      />
+                      <span>{t}</span>
+                    </label>
+                  )
+                )}
+              </div>
+
+              <div className="mt-6">
+                <div className="font-semibold mb-2">Text Size: {textSize}px</div>
+                <input
+                  type="range"
+                  min="10"
+                  max="24"
+                  step="1"
+                  value={textSize}
+                  onChange={(e) => mergeSettings({ textSize: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="mt-6">
+                <div className="font-semibold mb-3">Token Settings</div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">
+                      Token Budget ($)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={tempPuterTokenAmount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || /^\\d*\\.?\\d*$/.test(val)) {
+                          setTempPuterTokenAmount(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-sm"
+                      style={inputBase}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">
+                      Tokens Used ($)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={tempUserUsedTokens}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || /^\\d*\\.?\\d*$/.test(val)) {
+                          setTempUserUsedTokens(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-sm"
+                      style={inputBase}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <button
+                    onClick={saveTokenSettings}
+                    className={buttonClass}
+                    style={{
+                      backgroundColor: themeVars.success,
+                      color: "#fff",
+                      border: `1px solid ${themeVars.success}`
+                    }}
+                  >
+                    Save Token Settings
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {settingsTab === "AI" && (
+            <div className="space-y-6">
+              <div>
+                <button
+                  onClick={() => setModelsExpanded(!modelsExpanded)}
+                  className="w-full flex items-center justify-between p-3"
+                  style={{ border: `1px solid ${themeVars.border}` }}
+                >
+                  <h3 className="text-base font-semibold">Selectable Models</h3>
+                  <span className="text-sm">{modelsExpanded ? "▼ Collapse" : "▶ Expand"}</span>
+                </button>
+
+                {modelsExpanded && (
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {Array.from(new Set(baseModels.map((m) => m.group))).map(
+                      (grp) => (
+                        <div
+                          key={grp}
+                          className="p-3"
+                          style={{ border: `1px solid ${themeVars.border}` }}
+                        >
+                          <div className="font-semibold mb-2">{grp}</div>
+                          <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
+                            {baseModels
+                              .filter((m) => m.group === grp)
+                              .map((m) => {
+                                const k = `${m.group}|${m.value}`;
+                                const checked = !!(
+                                  (settings &&
+                                    settings.enabledMap &&
+                                    settings.enabledMap[k]) ||
+                                  false
+                                );
+                                return (
+                                  <label
+                                    key={k}
+                                    className="flex items-center gap-2 text-sm"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() =>
+                                        toggleModelEnabled(m.group, m.value)
+                                      }
+                                    />
+                                    <span>{m.label}</span>
+                                  </label>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <button
+                  onClick={() => setPuterSectionExpanded(!puterSectionExpanded)}
+                  className="w-full flex items-center justify-between p-3 mb-2"
+                  style={{ border: `1px solid ${themeVars.border}` }}
+                >
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={!!(settings && settings.puterEnabled)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          mergeSettings({ puterEnabled: e.target.checked });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span className="font-semibold">Enable Puter</span>
+                    </label>
+                  </div>
+                  <span className="text-sm">{puterSectionExpanded ? "▼ Collapse" : "▶ Expand"}</span>
+                </button>
+
+                {puterSectionExpanded && (
+                  <div className="space-y-3">
+                    <button
+                      onClick={refreshPuterModels}
+                      className={buttonClass}
+                      style={{
+                        backgroundColor: themeVars.primary,
+                        color: "#fff",
+                        border: `1px solid ${themeVars.primary}`
+                      }}
+                    >
+                      {loadingPuterModels ? "Refreshing..." : "Refresh Puter Models"}
+                    </button>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={selectAllPuterModels}
+                        className={buttonClass}
+                        style={{
+                          backgroundColor: themeVars.success,
+                          color: "#fff",
+                          border: `1px solid ${themeVars.success}`
+                        }}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={deselectAllPuterModels}
+                        className={buttonClass}
+                        style={{
+                          backgroundColor: themeVars.warn,
+                          color: "#fff",
+                          border: `1px solid ${themeVars.warn}`
+                        }}
+                      >
+                        Deselect All
+                      </button>
+                      <input
+                        type="text"
+                        placeholder="Search models..."
+                        value={puterSearchText}
+                        onChange={(e) => setPuterSearchText(e.target.value)}
+                        className="flex-1 px-3 py-2 text-sm"
+                        style={inputBase}
+                      />
+                    </div>
+
+                    <div
+                      className="p-3"
+                      style={{ border: `1px solid ${themeVars.border}` }}
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto no-scrollbar">
+                        {filteredPuterModels.map((name) => {
+                          const k = `Puter|${name}`;
+                          const checked = !!(
+                            (settings &&
+                              settings.enabledMap &&
+                              settings.enabledMap[k]) ||
+                            false
+                          );
+                          return (
+                            <label
+                              key={k}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleModelEnabled("Puter", name)}
+                              />
+                              <span>{name}</span>
+                            </label>
+                          );
+                        })}
+                        {filteredPuterModels.length === 0 && (
+                          <div className="text-xs opacity-70 col-span-2 text-center py-4">
+                            {puterSearchText.trim() ? "No matching models found" : "No Puter models loaded"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <button
+                  onClick={() => setPollinationsSectionExpanded(!pollinationsSectionExpanded)}
+                  className="w-full flex items-center justify-between p-3 mb-2"
+                  style={{ border: `1px solid ${themeVars.border}` }}
+                >
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={!!(settings && settings.pollinationsEnabled)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          mergeSettings({
+                            pollinationsEnabled: e.target.checked
+                          });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span className="font-semibold">Enable Pollinations</span>
+                    </label>
+                  </div>
+                  <span className="text-sm">{pollinationsSectionExpanded ? "▼ Collapse" : "▶ Expand"}</span>
+                </button>
+
+                {pollinationsSectionExpanded && (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={selectAllPollinationsModels}
+                        className={buttonClass}
+                        style={{
+                          backgroundColor: themeVars.success,
+                          color: "#fff",
+                          border: `1px solid ${themeVars.success}`
+                        }}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={deselectAllPollinationsModels}
+                        className={buttonClass}
+                        style={{
+                          backgroundColor: themeVars.warn,
+                          color: "#fff",
+                          border: `1px solid ${themeVars.warn}`
+                        }}
+                      >
+                        Deselect All
+                      </button>
+                    </div>
+                    <div
+                      className="p-3"
+                      style={{ border: `1px solid ${themeVars.border}` }}
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto no-scrollbar">
+                        {pollinationsModels.map((name) => {
+                          const k = `Pollinations|${name}`;
+                          const checked = !!(
+                            (settings &&
+                              settings.enabledMap &&
+                              settings.enabledMap[k]) ||
+                            false
+                          );
+                          return (
+                            <label
+                              key={k}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  toggleModelEnabled("Pollinations", name)
+                                }
+                              />
+                              <span>{name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div
+          className="px-4 py-3 flex items-center justify-end"
+          style={{ borderTop: `1px solid ${themeVars.border}` }}
+        >
+          <button
+            onClick={() => setSettingsOpen(false)}
+            className={buttonClass}
+            style={{
+              backgroundColor: themeVars.primary,
+              color: "#fff",
+              border: `1px solid ${themeVars.primary}`
+            }}
+          >
+            Save & Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+
+```
+
+);
+}
+// prettier-ignore-end
+
+```
+try {
+  const rootElement = document.getElementById("container");
+  if (!rootElement) throw new Error('Container not found');
+  if (typeof App === 'undefined') throw new Error('App not defined');
+
+  const root = createRoot(rootElement);
+  root.render(<App />);
+} catch (error) {
+  console.error('⚠️ Export Error:', error);
+  document.body.innerHTML = `<div style="padding: 40px; text-align: center; font-family: system-ui; max-width: 600px; margin: 100px auto;"><h1 style="color: #ef4444; margin-bottom: 20px;">⚠️ Export Error</h1><p style="color: #64748b; margin-bottom: 10px;">The app could not be loaded.</p><p style="color: #ef4444; font-size: 14px; font-weight: 600;">${error.message}</p><p style="color: #64748b; font-size: 12px; margin-top: 20px;">Check the browser console for details.</p></div>`;
+}
+
+```
+
+</script>
+<!--
+Agents see LLMs docs:
+Database: https://use-fireproof.com/llms-full.txt
+CallAI: https://use-fireproof.com/callai-llms.txt
+ImgGen: https://use-fireproof.com/imggen-llms.txt
+-->
+</body>
+
+</html>
