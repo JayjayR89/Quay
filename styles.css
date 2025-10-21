@@ -1,34 +1,35 @@
 /* styles.css
-   Moved larger CSS pieces out of index.html to keep markup concise.
-   Tailwind is used for layout styling; this file contains a few utility rules
-   and the ExtraCSS used by the app.
+   Moved key UI CSS from the original file into a separate stylesheet.
+   This includes ExtraCSS and a few layout helpers used by the app.
 */
+
+:root {
+  --bg: #ecf0f1;
+  --text: #34495e;
+  --panel: #ffffff;
+  --border: rgba(0,0,0,0.08);
+}
 
 html, body, #container {
   height: 100%;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: #ecf0f1;
-  color: #34495e;
+  background: var(--bg);
+  color: var(--text);
 }
 
-/* ExtraCSS helpers */
+/* ExtraCSS from the original app */
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
-.cursor-col-resize {
-  cursor: col-resize;
+@keyframes pulseBorder {
+  0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.04); }
+  70% { box-shadow: 0 0 0 8px rgba(255,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
 }
+.app-spotlight { animation: pulseBorder 1.6s infinite; }
 
-/* Simple responsive adjustments */
-@media (max-width: 767px) {
-  .cursor-col-resize { display: none; }
-}
+.cursor-col-resize { cursor: col-resize; }
+.editor-area { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace; font-size: 13px; }
 
-/* Keep the preview iframe filling its container */
-iframe {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: white;
-}
+iframe { display: block; width: 100%; border: 0; background: #fff; }
