@@ -11,25 +11,20 @@
 
   <!-- Tailwind CDN for standalone HTML exports -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-
-  <!-- App styles -->
-  <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
   <div id="container"></div>
 
-  <!-- Small inline runtime config and helper functions that are safe to keep in HTML -->
   <script>
-    // App-level runtime config (can be overridden by environment)
+    // Small runtime config preserved here
     window.CALLAI_API_KEY = "sk-vibes-proxy-managed";
     window.CALLAI_CHAT_URL = "https://vibes-diy-api.com/";
     window.CALLAI_IMG_URL = "https://vibes-diy-api.com/";
 
-    // PrimalCore badge helper functions
+    // Preserve original primalcore badge helpers exactly as in repository
     function closePrimalCoreBanner() {
       const badge = document.getElementById('primalcore-badge');
-      if (!badge) return;
       badge.classList.add('hidden');
       localStorage.setItem('primalcoreBannerClosed', 'true');
       setTimeout(() => badge.remove(), 200);
@@ -43,7 +38,6 @@
     });
   </script>
 
-  <!-- import map for dependencies used by the app -->
   <script type="importmap">
   {
     "imports": {
@@ -57,8 +51,9 @@
   }
   </script>
 
-  <!-- Main React application (kept as an external Babel-transformed module) -->
-  <script type="text/babel" data-type="module" src="app.jsx"></script>
+  <!-- Main React app (Babel in-browser transform) -->
+  <script type="text/babel" data-type="module" data-presets="react" src="app.jsx"></script>
+  <link rel="stylesheet" href="styles.css" />
 </body>
 
 </html>
