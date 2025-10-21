@@ -1,0 +1,34 @@
+/* styles.css
+   Moved larger CSS pieces out of index.html to keep markup concise.
+   Tailwind is used for layout styling; this file contains a few utility rules
+   and the ExtraCSS used by the app.
+*/
+
+html, body, #container {
+  height: 100%;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #ecf0f1;
+  color: #34495e;
+}
+
+/* ExtraCSS helpers */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+.cursor-col-resize {
+  cursor: col-resize;
+}
+
+/* Simple responsive adjustments */
+@media (max-width: 767px) {
+  .cursor-col-resize { display: none; }
+}
+
+/* Keep the preview iframe filling its container */
+iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: white;
+}
